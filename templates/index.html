@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LandslideGuard AI — Early Warning & Geo-Hazard Monitoring Command Center</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+    <!-- Custom Command Center CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="command-center">
+
+    <!-- Top Navigation & Live Telemetry Ticker -->
+    <header class="top-nav">
+        <div class="brand-zone">
+            <div class="logo-badge">
+                <i class="fa-solid fa-mountain-sun"></i>
+            </div>
+            <div class="brand-titles">
+                <h1>LandslideGuard <span class="ai-pill">AI</span></h1>
+                <p class="subtitle">Autonomous Landslide Early Warning & Geo-Hazard Decision System</p>
+            </div>
+        </div>
+
+        <div class="center-ticker">
+            <div class="ticker-pulse"></div>
+            <span class="ticker-label">EARLY WARNING FEED:</span>
+            <div class="ticker-marquee" id="tickerContent">
+                <span class="ticker-item"><i class="fa-solid fa-triangle-exclamation text-crimson"></i> Monitoring 7 Geological Sectors | High Susceptibility detected in Western Ghats</span>
+            </div>
+        </div>
+
+        <div class="telemetry-bar">
+            <!-- Search Database Button -->
+            <button class="btn-nav-action" onclick="openSearchDbModal()" title="View SQLite Database of All Searched Areas">
+                <i class="fa-solid fa-database text-cyan"></i>
+                <span>Areas Database (<span id="searchDbCount">0</span>)</span>
+            </button>
+
+            <!-- Satellite Imagery Tool (Step 14) -->
+            <button class="btn-nav-action" onclick="openSatelliteModal()" title="Satellite & Drone Terrain Inspection">
+                <i class="fa-solid fa-satellite"></i>
+                <span>Satellite Scan</span>
+            </button>
+
+            <!-- Voice Alert Toggle -->
+            <button id="voiceAlertToggle" class="btn-icon" title="Toggle AI Voice & Siren Alerts" onclick="toggleVoiceAlert()">
+                <i class="fa-solid fa-bullhorn text-cyan"></i>
+            </button>
+
+            <div class="status-indicator live">
+                <span class="indicator-dot"></span>
+                <span>AI SENTINEL ONLINE</span>
+            </div>
+            <div class="clock-badge" id="systemClock">--:--:-- UTC</div>
+        </div>
+    </header>
+
+    <!-- Emergency Warning Banner (Step 12) -->
+    <section id="alertBanner" class="alert-banner hidden">
+        <div class="alert-banner-inner">
+            <div class="alert-icon-wrap pulse-ring">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="alert-text-wrap">
+                <div class="alert-header">
+                    <span class="alert-tag">EARLY WARNING ALERT</span>
+                    <span class="alert-location" id="alertLocationName">Location: Wayanad Hills</span>
+                </div>
+                <h3 id="alertHeadline">⚠️ HIGH LANDSLIDE RISK DETECTED</h3>
+                <p id="alertSummary">Heavy rainfall + steep terrain detected. Authorities should monitor the region.</p>
+            </div>
+            <div class="alert-actions">
+                <button class="btn btn-warning-action" onclick="openEmergencyModal()">
+                    <i class="fa-solid fa-shield-halved"></i> Recommended Action
+                </button>
+                <button class="btn btn-ghost" onclick="dismissBanner()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 1-Click Hackathon Judging Scenarios Bar (Step 15) -->
+    <section class="demo-scenarios-bar">
+        <div class="scenario-label">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>Hackathon Demos:</span>
+        </div>
+        <div class="scenario-buttons" id="scenarioButtons">
+            <button class="scenario-btn active" onclick="loadScenario('monsoon_catastrophe')">
+                <span class="badge-dot red"></span> 🚨 Wayanad Monsoon (High 92%)
+            </button>
+            <button class="scenario-btn" onclick="loadScenario('moderate_storm')">
+                <span class="badge-dot orange"></span> ⚠️ Munnar Tea Slope (Elevated 75%)
+            </button>
+            <button class="scenario-btn" onclick="loadScenario('moderate_urban_hill')">
+                <span class="badge-dot yellow"></span> 🟡 Shimla Town (Watch 53%)
+            </button>
+            <button class="scenario-btn" onclick="loadScenario('stable_forested')">
+                <span class="badge-dot green"></span> 🟢 Coorg Ridge (Stable 30%)
+            </button>
+            <button class="scenario-btn" onclick="loadScenario('safe_basin')">
+                <span class="badge-dot green"></span> ☀️ Dehradun Plains (Safe 7%)
+            </button>
+        </div>
+    </section>
+
+    <!-- Quick KPI Cards Strip (Step 10 Dashboard specification) -->
+    <section class="kpi-strip">
+        <div class="kpi-card">
+            <span class="kpi-icon text-cyan"><i class="fa-solid fa-cloud-showers-heavy"></i></span>
+            <div class="kpi-data">
+                <span class="kpi-title">Rainfall</span>
+                <span class="kpi-val" id="kpiRainfall">195 mm</span>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-icon text-orange"><i class="fa-solid fa-mountain"></i></span>
+            <div class="kpi-data">
+                <span class="kpi-title">Slope Gradient</span>
+                <span class="kpi-val" id="kpiSlope">41.5°</span>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-icon text-blue"><i class="fa-solid fa-droplet"></i></span>
+            <div class="kpi-data">
+                <span class="kpi-title">Soil Moisture</span>
+                <span class="kpi-val" id="kpiSoilMoisture">89.2%</span>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-icon text-purple"><i class="fa-solid fa-gauge-high"></i></span>
+            <div class="kpi-data">
+                <span class="kpi-title">Elevation</span>
+                <span class="kpi-val" id="kpiElevation">1050 m</span>
+            </div>
+        </div>
+        <div class="kpi-card highlight-risk" id="kpiRiskBox">
+            <span class="kpi-icon text-crimson"><i class="fa-solid fa-triangle-exclamation"></i></span>
+            <div class="kpi-data">
+                <span class="kpi-title">Landslide Risk Score</span>
+                <span class="kpi-val risk-text" id="kpiRiskScore">92%</span>
+            </div>
+            <span class="kpi-badge red" id="kpiRiskBadge">🔴 HIGH</span>
+        </div>
+    </section>
+
+    <!-- Main Grid Dashboard (Compact 3-Column Command Center) -->
+    <main class="dashboard-grid">
+
+        <!-- Column 1: Environmental Sensor & Simulation Controls -->
+        <aside class="panel glass-card left-panel">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-sliders"></i> Sensor Telemetry Input</h2>
+                <button class="btn-tiny" id="btnResetTelemetry" title="Reset to Defaults">
+                    <i class="fa-solid fa-rotate-right"></i> Reset
+                </button>
+            </div>
+
+            <div class="monitored-zone-selector">
+                <label for="zoneSelect"><i class="fa-solid fa-map-pin"></i> Monitored Geological Zone:</label>
+                <select id="zoneSelect" class="form-select">
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+
+            <form id="predictionForm" class="sensor-form">
+                <!-- Rainfall -->
+                <div class="control-group">
+                    <div class="control-label-row">
+                        <label for="rainfallInput"><i class="fa-solid fa-cloud-showers-heavy text-cyan"></i> Rainfall (24-48h)</label>
+                        <span class="val-display" id="rainfallVal">195 mm</span>
+                    </div>
+                    <input type="range" id="rainfallInput" min="0" max="350" step="1" value="195" class="slider-input">
+                    <div class="range-marks">
+                        <span>0 mm</span>
+                        <span>80 (Watch)</span>
+                        <span>150 (Hazard)</span>
+                        <span>350 mm</span>
+                    </div>
+                </div>
+
+                <!-- Slope Angle -->
+                <div class="control-group">
+                    <div class="control-label-row">
+                        <label for="slopeInput"><i class="fa-solid fa-chart-line text-orange"></i> Slope Angle</label>
+                        <span class="val-display" id="slopeVal">41.5°</span>
+                    </div>
+                    <input type="range" id="slopeInput" min="0" max="60" step="0.5" value="41.5" class="slider-input">
+                    <div class="range-marks">
+                        <span>0° (Plains)</span>
+                        <span>25° (Moderate)</span>
+                        <span>35° (Critical Repose)</span>
+                        <span>60°</span>
+                    </div>
+                </div>
+
+                <!-- Soil Moisture -->
+                <div class="control-group">
+                    <div class="control-label-row">
+                        <label for="soilMoistureInput"><i class="fa-solid fa-droplet text-blue"></i> Soil Pore-Water Saturation</label>
+                        <span class="val-display" id="soilMoistureVal">89.2%</span>
+                    </div>
+                    <input type="range" id="soilMoistureInput" min="10" max="100" step="0.5" value="89.2" class="slider-input">
+                    <div class="range-marks">
+                        <span>10% (Dry)</span>
+                        <span>50% (Normal)</span>
+                        <span>80% (Critical)</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <!-- Elevation & Prior Events -->
+                <div class="control-row-grid">
+                    <div class="control-group half">
+                        <label for="elevationInput"><i class="fa-solid fa-mountain"></i> Elevation (m)</label>
+                        <input type="number" id="elevationInput" min="50" max="3500" value="1050" class="form-input">
+                    </div>
+                    <div class="control-group half">
+                        <label for="historicalEventsInput"><i class="fa-solid fa-clock-rotate-left"></i> Prior Failures</label>
+                        <input type="number" id="historicalEventsInput" min="0" max="10" value="5" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Land Cover -->
+                <div class="control-group">
+                    <label for="landCoverSelect"><i class="fa-solid fa-tree"></i> Land Cover / Regolith</label>
+                    <select id="landCoverSelect" class="form-select">
+                        <option value="Forest">Forest (Protective Root Cohesion)</option>
+                        <option value="Agriculture">Agriculture / Terraced Slope</option>
+                        <option value="Grassland">Grassland (Shallow Roots)</option>
+                        <option value="Barren" selected>Bare land / Deforested (High Hazard)</option>
+                        <option value="Urban">Urban / Cut Incline (Cut-Slope Stress)</option>
+                    </select>
+                </div>
+
+                <button type="submit" id="btnRunPrediction" class="btn btn-primary btn-block">
+                    <i class="fa-solid fa-microchip"></i> Run AI Risk Prediction
+                </button>
+            </form>
+
+            <!-- Model Health Mini Card -->
+            <div class="model-mini-stats">
+                <div class="mini-stat">
+                    <span class="stat-title">AI Model</span>
+                    <span class="stat-val">Random Forest</span>
+                </div>
+                <div class="mini-stat">
+                    <span class="stat-title">Disaster Recall</span>
+                    <span class="stat-val highlight">94.4%</span>
+                </div>
+                <div class="mini-stat">
+                    <span class="stat-title">Accuracy</span>
+                    <span class="stat-val">95.5%</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Column 2: Geospatial Interactive Risk Map (Step 11) -->
+        <section class="panel glass-card center-panel">
+            <div class="panel-header">
+                <div class="header-left">
+                    <h2><i class="fa-solid fa-map-location-dot"></i> Geospatial Risk Map & India Search</h2>
+                    <span class="map-badge" id="mapActiveCount">7 Stations Active</span>
+                </div>
+                <div class="map-layer-switch">
+                    <button class="layer-btn active" id="btnLayerStreet" onclick="setMapLayer('street')">
+                        <i class="fa-solid fa-road"></i> Clear Map
+                    </button>
+                    <button class="layer-btn" id="btnLayerSat" onclick="setMapLayer('satellite')">
+                        <i class="fa-solid fa-satellite"></i> Satellite
+                    </button>
+                    <button class="layer-btn" id="btnLayerDark" onclick="setMapLayer('dark')">
+                        <i class="fa-solid fa-moon"></i> Dark GIS
+                    </button>
+                </div>
+            </div>
+
+            <!-- All-India Search Bar -->
+            <div class="map-search-bar-container">
+                <div class="search-input-wrap">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="indiaSearchInput" placeholder="Search ANY location in India (e.g., Kedarnath, Ooty, Gangtok, Idukki, Manali, Almora)..." autocomplete="off">
+                    <button id="btnClearSearch" class="btn-clear-search hidden" onclick="clearSearchInput()"><i class="fa-solid fa-circle-xmark"></i></button>
+                    <div id="searchSuggestions" class="search-suggestions hidden"></div>
+                </div>
+                <button id="btnSearchIndia" class="btn-search-trigger" onclick="handleIndiaSearch()">
+                    <i class="fa-solid fa-location-crosshairs"></i> Locate & Analyze
+                </button>
+            </div>
+
+            <!-- Leaflet Map Container -->
+            <div class="map-wrapper">
+                <div id="leafletMap"></div>
+
+                <!-- Floating Map Legend -->
+                <div class="map-legend glass-overlay">
+                    <div class="legend-title"><i class="fa-solid fa-layer-group"></i> Susceptibility Index</div>
+                    <div class="legend-row"><span class="legend-pill green"></span> 🟢 Low (&lt; 40%)</div>
+                    <div class="legend-row"><span class="legend-pill yellow"></span> 🟡 Moderate (40 - 70%)</div>
+                    <div class="legend-row"><span class="legend-pill red pulse"></span> 🔴 High (&gt; 70%)</div>
+                </div>
+
+                <!-- Interactive Map Inspector Tooltip -->
+                <div id="mapTooltipCard" class="map-tooltip-card glass-overlay hidden">
+                    <div class="tooltip-header">
+                        <span id="tooltipZoneName">Zone</span>
+                        <button onclick="closeMapTooltip()" class="tooltip-close"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="tooltip-body" id="tooltipContent"></div>
+                </div>
+            </div>
+
+            <!-- Sector Summary Quick Chips -->
+            <div class="sector-strip" id="sectorSummaryStrip">
+                <!-- Dynamic Chips -->
+            </div>
+        </section>
+
+        <!-- Column 3: Real-Time Risk Analytics & Decision Support -->
+        <aside class="panel glass-card right-panel">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-chart-pie"></i> Risk Analytics & Decision Support</h2>
+                <span class="badge" id="riskBadge">HIGH RISK</span>
+            </div>
+
+            <!-- Risk Gauge & Core Score Display -->
+            <div class="score-card-hero">
+                <div class="gauge-container">
+                    <svg class="radial-gauge" viewBox="0 0 160 160">
+                        <circle class="gauge-bg" cx="80" cy="80" r="68"></circle>
+                        <circle class="gauge-bar" id="gaugeBar" cx="80" cy="80" r="68"></circle>
+                    </svg>
+                    <div class="gauge-center-content">
+                        <span class="gauge-number" id="riskScoreNum">92%</span>
+                        <span class="gauge-sub">LANDSLIDE RISK</span>
+                    </div>
+                </div>
+
+                <div class="hero-stats-column">
+                    <div class="hero-stat-box">
+                        <span class="hero-label">Susceptibility Band</span>
+                        <span class="hero-val-badge high" id="riskCategoryBadge">🔴 HIGH RISK</span>
+                    </div>
+                    <div class="hero-stat-box">
+                        <span class="hero-label">Status</span>
+                        <span class="hero-val" id="dispStatus">CRITICAL SURVEILLANCE</span>
+                    </div>
+                    <div class="hero-stat-box">
+                        <span class="hero-label">Target Zone</span>
+                        <span class="hero-val text-cyan" id="dispZone">Wayanad Hills (Meppadi)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 13: 7-Day Historical Monitoring ("Risk Over Time") -->
+            <div class="section-card trend-card">
+                <div class="trend-header">
+                    <div>
+                        <h3><i class="fa-solid fa-clock-rotate-left"></i> Historical Monitoring: Risk Over Time</h3>
+                        <span class="trend-sub" id="trendLocationTitle">Wayanad Sector</span>
+                    </div>
+                    <span class="trend-badge" id="trendBadge">▲ +60% Escalation</span>
+                </div>
+
+                <div class="history-story-note">
+                    <i class="fa-solid fa-arrow-trend-up text-crimson"></i>
+                    <span><strong>Shows:</strong> Risk has been increasing over time</span>
+                </div>
+
+                <!-- Day-by-Day Progression Strip (Step 13) -->
+                <div class="day-progression-strip" id="dayProgressionStrip">
+                    <!-- Populated via JS: Mon 32% 🟢, Tue 41% 🟡, ..., Today 92% 🔴 -->
+                </div>
+
+                <!-- 7-Day Chart -->
+                <div class="chart-wrapper">
+                    <canvas id="historyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Explainable AI: Contributing Factors -->
+            <div class="section-card factors-card">
+                <h3><i class="fa-solid fa-brain"></i> Explainable AI — Contributing Factors</h3>
+                <div class="factors-list" id="factorsList">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <!-- Early Warning Advisory & Emergency Guidelines (Step 12) -->
+            <div class="section-card advisory-card" id="advisoryCard">
+                <div class="advisory-title-row">
+                    <i class="fa-solid fa-shield-halved text-crimson" id="advisoryIcon"></i>
+                    <h3 id="advisoryHeadline">Emergency Decision Support Advisory</h3>
+                </div>
+                <div class="advisory-sub-headline">
+                    <strong>Recommended action:</strong> Increase monitoring and assess whether local authorities should issue an official warning.
+                </div>
+                <ul class="advisory-list" id="advisoryList">
+                    <li>Precautionary evacuation recommended for downhill settlements.</li>
+                    <li>Mobilize local disaster response units (SDRF/NDRF) to sector staging points.</li>
+                    <li>Impose immediate transit restrictions on steep mountain pass stretches.</li>
+                </ul>
+                <div class="advisory-actions">
+                    <button class="btn btn-export" onclick="exportIncidentReport()">
+                        <i class="fa-solid fa-file-arrow-down"></i> Export Advisory Report
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- Satellite / Drone Imagery Inspection Modal (Step 14) -->
+    <div id="satelliteModal" class="modal-overlay hidden">
+        <div class="modal-content glass-card sat-modal-wide">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-solid fa-satellite text-cyan"></i>
+                    <h3>Satellite & Drone Terrain Inspection (Sentinel-1 SAR / Sentinel-2)</h3>
+                </div>
+                <button class="modal-close-btn" onclick="closeSatelliteModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="modal-desc">
+                    Multispectral vegetation loss and InSAR surface displacement for <strong><span id="satModalZone">Wayanad Hills</span></strong>:
+                </p>
+
+                <!-- Interactive Before vs After Split Curtain Slider -->
+                <div class="split-image-container" id="splitImgContainer">
+                    <div class="split-img-layer after-layer">
+                        <div class="layer-badge alert">AFTER (Precipitation Inundation & Fissures)</div>
+                        <div class="mock-satellite-view after-view">
+                            <div class="contour-grid"></div>
+                            <div class="ai-box box-1 pulse"><span class="box-tag">⚠️ Fissure Tension Crack #1 (42m)</span></div>
+                            <div class="ai-box box-2 pulse"><span class="box-tag">⚠️ Active Creep: 4.8 cm/day</span></div>
+                        </div>
+                    </div>
+                    <div class="split-img-layer before-layer" id="beforeLayer">
+                        <div class="layer-badge">BEFORE (Dry Baseline)</div>
+                        <div class="mock-satellite-view before-view">
+                            <div class="contour-grid"></div>
+                            <span class="safe-caption"><i class="fa-solid fa-circle-check text-emerald"></i> Stable Vegetative Cover • Zero Fissures</span>
+                        </div>
+                    </div>
+                    <!-- Draggable Comparison Divider -->
+                    <input type="range" min="0" max="100" value="50" class="split-slider-range" id="splitSliderRange" oninput="updateSplitSlider(this.value)">
+                    <div class="split-divider-line" id="splitDividerLine">
+                        <div class="split-handle-btn"><i class="fa-solid fa-arrows-left-right"></i></div>
+                    </div>
+                </div>
+                <div class="split-slider-hint">
+                    <i class="fa-solid fa-hand-pointer text-cyan"></i> Drag slider left/right to peel Before vs After AI anomaly overlay
+                </div>
+
+                <!-- Satellite Telemetry Stats Grid -->
+                <div class="satellite-metrics-grid">
+                    <div class="sat-metric">
+                        <span class="sat-label">Surface Displacement Rate</span>
+                        <strong class="sat-val text-crimson">4.8 cm / day</strong>
+                    </div>
+                    <div class="sat-metric">
+                        <span class="sat-label">Vegetation Loss Index (NDVI)</span>
+                        <strong class="sat-val text-orange">-0.34 (Regolith Exposed)</strong>
+                    </div>
+                    <div class="sat-metric">
+                        <span class="sat-label">Tension Cracks Detected</span>
+                        <strong class="sat-val text-crimson">3 Active Crown Fissures</strong>
+                    </div>
+                    <div class="sat-metric">
+                        <span class="sat-label">InSAR Stability Status</span>
+                        <strong class="sat-val text-crimson">ACTIVE SHEAR COLLAPSE RISK</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSatelliteModal()">Close Inspection</button>
+                <button class="btn btn-primary" onclick="alert('Drone LiDAR dispatch command simulated for active zone.')">
+                    <i class="fa-solid fa-paper-plane"></i> Dispatch Autonomous Drone LiDAR Scan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Official Emergency Protocol Modal (Step 12) -->
+    <div id="emergencyModal" class="modal-overlay hidden">
+        <div class="modal-content glass-card alert-modal">
+            <div class="modal-header alert-header-style">
+                <div class="modal-title">
+                    <i class="fa-solid fa-triangle-exclamation text-crimson"></i>
+                    <h3>⚠️ HIGH LANDSLIDE RISK ALERT — OFFICIAL PROTOCOL</h3>
+                </div>
+                <button class="modal-close-btn" onclick="closeEmergencyModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="alert-modal-badge">
+                    <span>SEVERITY: CRITICAL (HIGH SUSCEPTIBILITY)</span>
+                </div>
+                <p class="alert-modal-msg">
+                    <strong>Location:</strong> <span id="modalAlertLoc">Wayanad Hills (Meppadi Sector)</span><br>
+                    <strong>Trigger Factors:</strong> Heavy precipitation (195 mm) + steep 41.5° slope + 89.2% pore-water saturation.<br>
+                    <strong>Disaster Assessment:</strong> Soil shear cohesion approaching zero. High hazard of rapid mud debris flow.
+                </p>
+
+                <h4 class="protocol-subheading"><i class="fa-solid fa-clipboard-check"></i> Standard Operating Procedures (SOP):</h4>
+                <div class="sop-checklist">
+                    <div class="sop-item"><i class="fa-solid fa-check text-crimson"></i> <strong>Evacuation:</strong> Issue immediate precautionary evacuation for downhill talus settlements.</div>
+                    <div class="sop-item"><i class="fa-solid fa-check text-crimson"></i> <strong>Traffic Control:</strong> Suspend night transit and heavy vehicles across vulnerable ghat stretches.</div>
+                    <div class="sop-item"><i class="fa-solid fa-check text-crimson"></i> <strong>First Responders:</strong> Mobilize local Disaster Response Units (SDRF/NDRF) to muster points.</div>
+                    <div class="sop-item"><i class="fa-solid fa-check text-crimson"></i> <strong>Continuous Telemetry:</strong> Keep 15-minute gauge intervals active on pore-pressure acoustic sensors.</div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEmergencyModal()">Acknowledge</button>
+                <button class="btn btn-warning-action" onclick="exportIncidentReport()">
+                    <i class="fa-solid fa-file-pdf"></i> Download Official Advisory
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Searched Areas in India Database Modal -->
+    <div id="searchDbModal" class="modal-overlay hidden">
+        <div class="modal-content glass-card db-modal-wide">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-solid fa-database text-cyan"></i>
+                    <h3>Searched Areas in India — SQLite Geological Registry</h3>
+                </div>
+                <button class="modal-close-btn" onclick="closeSearchDbModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="db-controls-row">
+                    <p class="db-summary-note">
+                        <i class="fa-solid fa-circle-info text-cyan"></i> 
+                        All locations searched by users across India are stored in the SQLite database with their terrain attributes and AI risk classifications.
+                    </p>
+                    <div class="db-action-buttons">
+                        <a href="/api/export-searched-locations" class="btn btn-primary btn-sm">
+                            <i class="fa-solid fa-file-arrow-down"></i> Export Database (CSV)
+                        </a>
+                        <button class="btn btn-secondary btn-sm" onclick="clearSearchHistory()">
+                            <i class="fa-solid fa-trash"></i> Clear Registry
+                        </button>
+                    </div>
+                </div>
+
+                <div class="db-table-wrapper">
+                    <table class="db-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Area / Search Query</th>
+                                <th>State / Region</th>
+                                <th>Coordinates</th>
+                                <th>Elevation & Slope</th>
+                                <th>Rainfall & Moisture</th>
+                                <th>AI Risk Score</th>
+                                <th>Recorded At</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchDbTableBody">
+                            <tr>
+                                <td colspan="9" class="text-center text-muted">No areas searched yet. Use the search bar above the map to look up any area in India!</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSearchDbModal()">Close Database</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="system-footer">
+        <div class="footer-left">
+            <span>LandslideGuard AI &copy; Hackathon Decision Support System</span>
+        </div>
+        <div class="footer-right">
+            <span>Decision Support Prototype • Public Safety Framework</span>
+        </div>
+    </footer>
+
+    <!-- Leaflet & Chart.js CDN -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- Custom Main JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
